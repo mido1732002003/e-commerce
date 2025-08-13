@@ -53,7 +53,7 @@ export function AddToCartButton({
         description: 'Please sign in to add items to your cart',
       })
       
-      router.push('/auth/sign-in?redirect=/product/' + product.id)
+      router.push('/sign-in?redirect=/product/' + product.id)
       return
     }
 
