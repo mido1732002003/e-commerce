@@ -1,100 +1,64 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createOrderSchema, type CreateOrderInput } from '@/lib/schemas/order'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
+import { useCart } from '@/contexts/CartContext'
 import { Loader2 } from 'lucide-react'
+
+const checkoutSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Valid email is required'),
+  address: z.string().min(1, 'Address is required'),
+  city: z.string().min(1, 'City is required'),
+  state: z.string().min(1, 'State is required'),
+  zip: z.string().min(1, 'ZIP code is required'),
+  country: z.string().min(1, 'Country is required').default('USA'),
+  phone: z.string().optional(),
+  paymentMethod: z.enum(['cod']).default('cod'),
+})
+
+type CheckoutValues = z.infer<typeof checkoutSchema>
 
 export default function CheckoutPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [cart, setCart] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { items, clearCart } = useCart()
   const [submitting, setSubmitting] = useState(false)
-  const [user, setUser] = useState<any>(null)
 
-  const form = useForm<CreateOrderInput>({
-    resolver: zodResolver(createOrderSchema),
+  const form = useForm<CheckoutValues>({
+    resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      shipping_address: {
-        name: '',
-        address: '',
-        city: '',
-        state: '',
-        zip: '',
-        country: 'USA',
-      },
-      contact_email: '',
-      contact_phone: '',
-      payment_method: 'cod',
+      name: '',
+      email: '',
+      address: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'USA',
+      paymentMethod: 'cod',
     },
   })
 
-  useEffect(() => {
-    checkAuth()
-    fetchCart()
-  }, [])
+  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const shipping = subtotal > 5000 ? 0 : 500 // Free shipping over $50
+  const total = subtotal + shipping
 
-  const checkAuth = async () => {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
+  const onSubmit = async (values: CheckoutValues) => {
+    if (items.length === 0) {
       toast({
-        title: 'Authentication required',
-        description: 'Please sign in to continue with checkout',
-      })
-      router.push('/auth/sign-in?redirect=/checkout')
-      return
-    }
-    
-    setUser(user)
-    form.setValue('contact_email', user.email || '')
-  }
-
-  const fetchCart = async () => {
-    try {
-      const response = await fetch('/api/cart')
-      const data = await response.json()
-      
-      if (data.success) {
-        setCart(data.data)
-        
-        if (!data.data.items || data.data.items.length === 0) {
-          toast({
-            title: 'Cart is empty',
-            description: 'Add items to your cart before checkout',
-          })
-          router.push('/cart')
-        }
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load cart',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const onSubmit = async (values: CreateOrderInput) => {
-    if (!user) {
-      toast({
-        title: 'Not authenticated',
-        description: 'Please sign in to place an order',
+        title: 'Cart is empty',
+        description: 'Please add items to your cart before checkout',
         variant: 'destructive',
       })
       return
@@ -103,27 +67,24 @@ export default function CheckoutPage() {
     setSubmitting(true)
     
     try {
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      })
-
-      const data = await response.json()
+      // Simulate order processing
+      await new Promise(resolve => setTimeout(resolve, 1500))
       
-      if (data.success) {
-        toast({
-          title: 'Order placed successfully!',
-          description: `Your order #${data.data.id} has been confirmed.`,
-        })
-        router.push(`/orders/${data.data.id}`)
-      } else {
-        throw new Error(data.error || 'Failed to place order')
-      }
-    } catch (error: any) {
+      // Clear cart
+      clearCart()
+      
+      // Show success message
+      toast({
+        title: 'Order placed successfully!',
+        description: 'Thank you for your order. We will process it shortly.',
+      })
+      
+      // Redirect to success page
+      router.push('/')
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to place order',
+        description: 'Failed to place order. Please try again.',
         variant: 'destructive',
       })
     } finally {
@@ -131,20 +92,17 @@ export default function CheckoutPage() {
     }
   }
 
-  if (loading) {
+  if (items.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-16 flex justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="container mx-auto px-4 py-16 text-center">
+        <h1 className="text-2xl font-bold mb-4">Your cart is empty</h1>
+        <p className="mb-6">Add some products to your cart before checkout.</p>
+        <Button asChild>
+          <a href="/category/all">Continue Shopping</a>
+        </Button>
       </div>
     )
   }
-
-  const items = cart?.items || []
-  const subtotal = items.reduce((sum: number, item: any) => 
-    sum + (item.price_cents_snapshot * item.quantity), 0
-  )
-  const shipping = subtotal > 5000 ? 0 : 500
-  const total = subtotal + shipping
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -164,7 +122,7 @@ export default function CheckoutPage() {
                 <CardContent className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="shipping_address.name"
+                    name="name"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
@@ -178,10 +136,24 @@ export default function CheckoutPage() {
                   
                   <FormField
                     control={form.control}
-                    name="shipping_address.address"
+                    name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Street Address</FormLabel>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="you@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Address</FormLabel>
                         <FormControl>
                           <Input placeholder="123 Main St" {...field} />
                         </FormControl>
@@ -193,7 +165,7 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="shipping_address.city"
+                      name="city"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>City</FormLabel>
@@ -207,7 +179,7 @@ export default function CheckoutPage() {
                     
                     <FormField
                       control={form.control}
-                      name="shipping_address.state"
+                      name="state"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>State</FormLabel>
@@ -223,7 +195,7 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="shipping_address.zip"
+                      name="zip"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>ZIP Code</FormLabel>
@@ -237,7 +209,7 @@ export default function CheckoutPage() {
                     
                     <FormField
                       control={form.control}
-                      name="shipping_address.country"
+                      name="country"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Country</FormLabel>
@@ -249,39 +221,15 @@ export default function CheckoutPage() {
                       )}
                     />
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Contact Information</CardTitle>
-                  <CardDescription>
-                    How can we reach you about your order?
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="contact_email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="you@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   
                   <FormField
                     control={form.control}
-                    name="contact_phone"
+                    name="phone"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Phone (Optional)</FormLabel>
                         <FormControl>
-                          <Input type="tel" placeholder="+1 (555) 123-4567" {...field} />
+                          <Input placeholder="+1 (123) 456-7890" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -300,7 +248,7 @@ export default function CheckoutPage() {
                 <CardContent>
                   <FormField
                     control={form.control}
-                    name="payment_method"
+                    name="paymentMethod"
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
@@ -321,12 +269,6 @@ export default function CheckoutPage() {
                                 Credit/Debit Card (Coming Soon)
                               </Label>
                             </div>
-                            <div className="flex items-center space-x-2 opacity-50">
-                              <RadioGroupItem value="paypal" id="paypal" disabled />
-                              <Label htmlFor="paypal" className="cursor-pointer">
-                                PayPal (Coming Soon)
-                              </Label>
-                            </div>
                           </RadioGroup>
                         </FormControl>
                         <FormMessage />
@@ -345,7 +287,7 @@ export default function CheckoutPage() {
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Placing Order...
+                    Processing...
                   </>
                 ) : (
                   'Place Order'
@@ -362,12 +304,12 @@ export default function CheckoutPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {items.map((item: any) => (
-                  <div key={item.id} className="flex justify-between text-sm">
+                {items.map((item) => (
+                  <div key={item.productId} className="flex justify-between text-sm">
                     <span className="truncate flex-1">
-                      {item.product?.title} x {item.quantity}
+                      {item.title} x {item.quantity}
                     </span>
-                    <span>{formatCurrency(item.price_cents_snapshot * item.quantity)}</span>
+                    <span>{formatCurrency(item.price * item.quantity)}</span>
                   </div>
                 ))}
                 

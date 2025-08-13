@@ -1,15 +1,18 @@
+// file: components/products/add-to-cart-button.tsx
 "use client"
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/components/ui/use-toast'
 import { ShoppingCart, Loader2 } from 'lucide-react'
+import { useCart } from '@/contexts/CartContext'
 
 interface AddToCartButtonProps {
   product: {
     id: number
     title: string
     stock: number
+    price_cents: number
+    images?: { url: string }[]
   }
   quantity?: number
   className?: string
@@ -22,44 +25,17 @@ export function AddToCartButton({
   className,
   size = 'default'
 }: AddToCartButtonProps) {
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const { addItem } = useCart()
 
   const handleAddToCart = async () => {
     setLoading(true)
     
     try {
-      console.log('Adding to cart:', product.id);
-      
-      const response = await fetch('/api/cart/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: product.id, quantity }),
-      })
-
-      console.log('Response status:', response.status);
-      const data = await response.json()
-      console.log('Response data:', data);
-
-      if (data.success) {
-        toast({
-          title: 'Added to cart',
-          description: `${product.title} has been added to your cart.`,
-        })
-      } else {
-        toast({
-          title: 'Error',
-          description: data.error || 'Failed to add item to cart',
-          variant: 'destructive',
-        })
-      }
+      // Use the context function to add the item
+      addItem(product, quantity)
     } catch (error) {
-      console.error('Add to cart error:', error);
-      toast({
-        title: 'Error',
-        description: 'Something went wrong',
-        variant: 'destructive',
-      })
+      console.error('Add to cart error:', error)
     } finally {
       setLoading(false)
     }

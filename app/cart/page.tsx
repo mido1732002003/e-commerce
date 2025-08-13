@@ -1,141 +1,19 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import { useCart } from '@/contexts/CartContext'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useToast } from '@/components/ui/use-toast'
 import { formatCurrency } from '@/lib/utils'
-import { Trash2, Plus, Minus, ShoppingBag } from 'lucide-react'
-// FIX: Import proper types
-import type { Cart, CartItem } from '@/types'
+import { ShoppingBag, Trash2, Plus, Minus } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 
 export default function CartPage() {
-  const router = useRouter()
-  const { toast } = useToast()
-  // FIX: Use proper Cart type instead of any
-  const [cart, setCart] = useState<Cart | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState<number | null>(null)
+  const { items, updateQuantity, removeItem, clearCart, isLoading } = useCart()
 
-  useEffect(() => {
-    fetchCart()
-  }, [])
-
-  const fetchCart = async () => {
-    try {
-      const response = await fetch('/api/cart')
-      const data = await response.json()
-      
-      if (data.success) {
-        setCart(data.data)
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load cart',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateQuantity = async (itemId: number, quantity: number) => {
-    if (quantity < 1) return
-    
-    setUpdating(itemId)
-    try {
-      const response = await fetch(`/api/cart/items/${itemId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity }),
-      })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        await fetchCart()
-      } else {
-        toast({
-          title: 'Error',
-          description: data.error || 'Failed to update quantity',
-          variant: 'destructive',
-        })
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update quantity',
-        variant: 'destructive',
-      })
-    } finally {
-      setUpdating(null)
-    }
-  }
-
-  const removeItem = async (itemId: number) => {
-    setUpdating(itemId)
-    try {
-      const response = await fetch(`/api/cart/items/${itemId}`, {
-        method: 'DELETE',
-      })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        await fetchCart()
-        toast({
-          title: 'Item removed',
-          description: 'Item has been removed from your cart',
-        })
-      } else {
-        toast({
-          title: 'Error',
-          description: data.error || 'Failed to remove item',
-          variant: 'destructive',
-        })
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to remove item',
-        variant: 'destructive',
-      })
-    } finally {
-      setUpdating(null)
-    }
-  }
-
-  const clearCart = async () => {
-    try {
-      const response = await fetch('/api/cart', {
-        method: 'DELETE',
-      })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        setCart({ ...cart!, items: [] })
-        toast({
-          title: 'Cart cleared',
-          description: 'All items have been removed from your cart',
-        })
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to clear cart',
-        variant: 'destructive',
-      })
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
@@ -176,14 +54,6 @@ export default function CartPage() {
     )
   }
 
-  const items = cart?.items || []
-  // FIX: Use proper type for reduce accumulator
-  const subtotal = items.reduce((sum: number, item: CartItem) => 
-    sum + (item.price_cents_snapshot * item.quantity), 0
-  )
-  const shipping = subtotal > 5000 ? 0 : 500 // Free shipping over $50
-  const total = subtotal + shipping
-
   if (items.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16">
@@ -201,65 +71,64 @@ export default function CartPage() {
     )
   }
 
+  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const shipping = subtotal > 5000 ? 0 : 500 // Free shipping over $50
+  const total = subtotal + shipping
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">
-          {items.map((item: CartItem) => (
-            <Card key={item.id}>
+          {items.map((item) => (
+            <Card key={item.productId}>
               <CardContent className="p-6">
                 <div className="flex gap-4">
                   <div className="relative w-24 h-24 rounded-md overflow-hidden">
                     <Image
-                      src={item.product?.images?.[0]?.url || 'https://via.placeholder.com/100'}
-                      alt={item.product?.title || 'Product'}
+                      src={item.imageUrl || 'https://via.placeholder.com/100'}
+                      alt={item.title || 'Product'}
                       fill
                       className="object-cover"
                     />
                   </div>
                   
                   <div className="flex-1">
-                    <Link href={`/product/${item.product?.slug}`}>
-                      <h3 className="font-semibold hover:text-primary transition-colors">
-                        {item.product?.title}
-                      </h3>
-                    </Link>
+                    <h3 className="font-semibold hover:text-primary transition-colors">
+                      {item.title}
+                    </h3>
                     <p className="text-lg font-bold text-primary mt-1">
-                      {formatCurrency(item.price_cents_snapshot)}
+                      {formatCurrency(item.price)}
                     </p>
                     
                     <div className="flex items-center gap-2 mt-3">
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        disabled={updating === item.id || item.quantity <= 1}
+                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                        disabled={item.quantity <= 1}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
                       <Input
                         type="number"
                         value={item.quantity}
-                        onChange={(e) => updateQuantity(item.id, parseInt(e.target.value))}
+                        onChange={(e) => updateQuantity(item.productId, parseInt(e.target.value))}
                         className="w-16 text-center"
                         min="1"
-                        disabled={updating === item.id}
                       />
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        disabled={updating === item.id}
+                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => removeItem(item.id)}
-                        disabled={updating === item.id}
+                        onClick={() => removeItem(item.productId)}
                         className="ml-auto"
                       >
                         <Trash2 className="h-4 w-4" />

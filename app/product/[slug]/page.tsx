@@ -1,56 +1,68 @@
-import { Metadata } from 'next'
+"use client"
+
+import { useState, useEffect } from 'react'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
-import { ShoppingCart, Package, Truck } from 'lucide-react'
+import { Package, Truck, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-// FIX: Added AddToCartButton component import
-import { AddToCartButton } from '@/components/products/add-to-cart-button'
+import { useCart } from '@/contexts/CartContext'
 
 interface ProductPageProps {
   params: { slug: string }
 }
 
-async function getProduct(slug: string) {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/products?q=${slug}`, {
-    cache: 'no-store',
-  })
+export default function ProductPage({ params }: ProductPageProps) {
+  const [product, setProduct] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [addingToCart, setAddingToCart] = useState(false)
+  const { addItem } = useCart()
 
-  if (!response.ok) {
-    return null
-  }
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        const response = await fetch(`/api/products?q=${params.slug}`)
+        if (!response.ok) {
+          throw new Error('Failed to fetch product')
+        }
+        const data = await response.json()
+        const foundProduct = data.data?.products?.find((p: any) => p.slug === params.slug)
+        if (foundProduct) {
+          setProduct(foundProduct)
+        }
+      } catch (error) {
+        console.error('Error fetching product:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchProduct()
+  }, [params.slug])
 
-  const data = await response.json()
-  const products = data.data?.products || []
-  
-  return products.find((p: any) => p.slug === slug)
-}
-
-export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const product = await getProduct(params.slug)
-  
-  if (!product) {
-    return {
-      title: 'Product Not Found - NextShop',
+  const handleAddToCart = async () => {
+    if (!product) return
+    
+    setAddingToCart(true)
+    try {
+      addItem(product, 1)
+    } catch (error) {
+      console.error('Error adding to cart:', error)
+    } finally {
+      setAddingToCart(false)
     }
   }
 
-  return {
-    title: `${product.title} - NextShop`,
-    description: product.description || `Buy ${product.title} at NextShop`,
-    openGraph: {
-      title: product.title,
-      description: product.description,
-      images: product.images?.[0]?.url ? [product.images[0].url] : [],
-    },
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-16 flex justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
   }
-}
-
-export default async function ProductPage({ params }: ProductPageProps) {
-  const product = await getProduct(params.slug)
 
   if (!product) {
     notFound()
@@ -131,12 +143,39 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </Card>
 
           <div className="flex gap-4">
-            {/* FIX: Replaced static Button with AddToCartButton component */}
-            <AddToCartButton 
-              product={product}
-              className="flex-1"
+            <Button
               size="lg"
-            />
+              className="flex-1"
+              disabled={product.stock === 0 || addingToCart}
+              onClick={handleAddToCart}
+            >
+              {addingToCart ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mr-2 h-5 w-5"
+                  >
+                    <circle cx="8" cy="21" r="1" />
+                    <circle cx="19" cy="21" r="1" />
+                    <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+                  </svg>
+                  Add to Cart
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </div>
