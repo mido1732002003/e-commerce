@@ -12,6 +12,7 @@ interface AddToCartButtonProps {
     id: number
     title: string
     stock: number
+    slug?: string
   }
   quantity?: number
   className?: string
@@ -40,8 +41,10 @@ export function AddToCartButton({
   }
 
   const handleAddToCart = async () => {
-    // FIX: Check authentication before adding to cart
+    // Check authentication before adding to cart
     if (!isAuthenticated) {
+      console.log('User not authenticated, showing sign-in toast');
+      
       // Store intended action in localStorage for after sign-in
       localStorage.setItem('pendingCartAdd', JSON.stringify({ 
         productId: product.id, 
@@ -53,19 +56,23 @@ export function AddToCartButton({
         description: 'Please sign in to add items to your cart',
       })
       
-      router.push('/sign-in?redirect=/product/' + product.id)
+      // FIX: Use the correct sign-in path 
+      console.log('Redirecting to /sign-in');
+      router.push('/sign-in');
       return
     }
 
     setLoading(true)
     
     try {
+      console.log('Sending add to cart request');
       const response = await fetch('/api/cart/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId: product.id, quantity }),
       })
 
+      console.log('Response status:', response.status);
       const data = await response.json()
 
       if (data.success) {
@@ -81,6 +88,7 @@ export function AddToCartButton({
         })
       }
     } catch (error) {
+      console.error('Add to cart error:', error);
       toast({
         title: 'Error',
         description: 'Something went wrong',
