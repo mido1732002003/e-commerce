@@ -1,18 +1,15 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { ShoppingCart, Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 
 interface AddToCartButtonProps {
   product: {
     id: number
     title: string
     stock: number
-    slug?: string
   }
   quantity?: number
   className?: string
@@ -25,47 +22,15 @@ export function AddToCartButton({
   className,
   size = 'default'
 }: AddToCartButtonProps) {
-  const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-
-  useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    setIsAuthenticated(!!user)
-  }
 
   const handleAddToCart = async () => {
-    // Check authentication before adding to cart
-    if (!isAuthenticated) {
-      console.log('User not authenticated, showing sign-in toast');
-      
-      // Store intended action in localStorage for after sign-in
-      localStorage.setItem('pendingCartAdd', JSON.stringify({ 
-        productId: product.id, 
-        quantity 
-      }))
-      
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to add items to your cart',
-      })
-      
-      // FIX: Use the correct sign-in path 
-      console.log('Redirecting to /sign-in');
-      router.push('/sign-in');
-      return
-    }
-
     setLoading(true)
     
     try {
-      console.log('Sending add to cart request');
+      console.log('Adding to cart:', product.id);
+      
       const response = await fetch('/api/cart/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,6 +39,7 @@ export function AddToCartButton({
 
       console.log('Response status:', response.status);
       const data = await response.json()
+      console.log('Response data:', data);
 
       if (data.success) {
         toast({

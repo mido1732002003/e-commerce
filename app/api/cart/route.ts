@@ -1,37 +1,48 @@
+// file: app/api/cart/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { getUser } from '@/lib/auth/helpers'
+import { createServiceClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ success: true, data: { items: [] } })
-    }
-
-    const supabase = createClient()
+    console.log('Cart GET: Starting request');
     
-    // Get or create cart
+    // Always use service client
+    const supabase = createServiceClient()
+    
+    // Get the user from the cookie
+    const cookieStore = cookies()
+    let userId = cookieStore.get('guest_cart_id')?.value
+    
+    if (!userId) {
+      // No cart yet, return empty cart
+      return NextResponse.json({ 
+        success: true, 
+        data: { 
+          id: null,
+          items: [] 
+        } 
+      })
+    }
+    
+    console.log('Using user/guest ID:', userId);
+    
+    // Get cart
     let { data: cart, error: cartError } = await supabase
       .from('carts')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
-    if (cartError && cartError.code === 'PGRST116') {
-      // Create cart if it doesn't exist
-      const { data: newCart, error: createError } = await supabase
-        .from('carts')
-        .insert({ user_id: user.id })
-        .select()
-        .single()
-
-      if (createError) {
-        throw createError
-      }
-      cart = newCart
-    } else if (cartError) {
-      throw cartError
+    if (cartError) {
+      // No cart found
+      return NextResponse.json({ 
+        success: true, 
+        data: { 
+          id: null,
+          items: [] 
+        } 
+      })
     }
 
     // Get cart items with product details
@@ -66,28 +77,28 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Always use service client
+    const supabase = createServiceClient()
+    
+    // Get the user from the cookie
+    const cookieStore = cookies()
+    let userId = cookieStore.get('guest_cart_id')?.value
+    
+    if (!userId) {
+      // Nothing to delete
+      return NextResponse.json({ success: true })
     }
-
-    const supabase = createClient()
     
     // Get user's cart
     const { data: cart, error: cartError } = await supabase
       .from('carts')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (cartError) {
-      if (cartError.code === 'PGRST116') {
-        return NextResponse.json({ success: true })
-      }
-      throw cartError
+      // No cart found
+      return NextResponse.json({ success: true })
     }
 
     // Delete all cart items
