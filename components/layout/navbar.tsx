@@ -48,14 +48,26 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     const supabase = createClient()
-    await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut()
+    
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to sign out',
+        variant: 'destructive',
+      })
+      return
+    }
+    
     setIsAuthenticated(false)
     setIsAdmin(false)
     toast({
       title: 'Signed out',
       description: 'You have been signed out successfully',
     })
-    router.refresh()
+    
+    // Force full page reload to clear all session data
+    window.location.href = '/'
   }
 
   return (

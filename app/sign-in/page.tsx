@@ -75,12 +75,28 @@ export default function SignInPage() {
         }
       }
 
+      // Migrate guest cart to user cart
+      try {
+        const guestCartId = localStorage.getItem('guest_cart_id')
+        if (guestCartId) {
+          await fetch('/api/cart/migrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          })
+          localStorage.removeItem('guest_cart_id')
+        }
+      } catch (e) {
+        console.error('Failed to migrate cart:', e)
+      }
+
       toast({
         title: 'Welcome back!',
         description: 'You have successfully signed in.',
       })
 
-      router.push(redirect)
+      // Ensure proper redirect to cart if coming from cart page
+      const isCartRedirect = redirect.includes('/cart')
+      router.push(isCartRedirect ? '/cart' : redirect)
       router.refresh()
     } catch (error: any) {
       toast({
