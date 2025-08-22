@@ -23,7 +23,13 @@ const ProductDetails = () => {
   const fetchProduct = async () => {
     try {
       const response = await axios.get(`/products/${id}`);
-      setProduct(response.data);
+      const data = response.data;
+
+      // تأكد إن images Array حتى لو الـ API رجع null أو object
+      setProduct({
+        ...data,
+        images: Array.isArray(data.images) ? data.images : [],
+      });
     } catch (error) {
       console.error('Error fetching product:', error);
       toast.error('Product not found');
@@ -32,6 +38,7 @@ const ProductDetails = () => {
       setLoading(false);
     }
   };
+
 
   const handleAddToCart = () => {
     dispatch(addToCart({ product, qty: quantity }));
