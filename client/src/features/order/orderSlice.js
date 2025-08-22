@@ -17,18 +17,28 @@ export const createOrder = createAsyncThunk(
     }
   }
 );
-
+// داخل orderSlice أو thunk بتاع fetchMyOrders
 export const fetchMyOrders = createAsyncThunk(
   'order/fetchMyOrders',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/orders/my');
-      return response.data;
+      const response = await axios.get('/orders/myorders');
+
+      // 🔥 معالجة البيانات بحيث ترجع Array دايمًا
+      const ordersArray = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data.orders)
+          ? response.data.orders
+          : [];
+
+      return ordersArray;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch orders');
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
+
+
 
 export const fetchAllOrders = createAsyncThunk(
   'order/fetchAllOrders',
