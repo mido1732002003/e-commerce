@@ -12,17 +12,24 @@ const Home = () => {
   useEffect(() => {
     fetchFeaturedProducts();
   }, []);
+const fetchFeaturedProducts = async () => {
+  try {
+    const response = await axios.get('/products?limit=6');
 
-  const fetchFeaturedProducts = async () => {
-    try {
-      const response = await axios.get('/products?limit=6');
-      setFeaturedProducts(response.data.slice(0, 6));
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // حماية من أي response مش Array
+    setFeaturedProducts(
+      Array.isArray(response.data) ? response.data.slice(0, 6) :
+      Array.isArray(response.data.products) ? response.data.products.slice(0, 6) :
+      [] // fallback لو response مش array
+    );
+
+  } catch (error) {
+    console.error('Error fetching products:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div>
