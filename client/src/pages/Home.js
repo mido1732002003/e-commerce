@@ -16,19 +16,24 @@ const fetchFeaturedProducts = async () => {
   try {
     const response = await axios.get('/products?limit=6');
 
-    // حماية من أي response مش Array
-    setFeaturedProducts(
-      Array.isArray(response.data) ? response.data.slice(0, 6) :
-      Array.isArray(response.data.products) ? response.data.products.slice(0, 6) :
-      [] // fallback لو response مش array
-    );
+    // جذرية: أي شكل response يتحول دائمًا Array
+    const productsArray = Array.isArray(response.data)
+      ? response.data
+      : Array.isArray(response.data.products)
+        ? response.data.products
+        : [];
 
+    setFeaturedProducts(productsArray.slice(0, 6));
+
+    console.log('Featured products:', productsArray); // للتأكد على production
   } catch (error) {
     console.error('Error fetching products:', error);
+    setFeaturedProducts([]); // fallback لو حصل خطأ
   } finally {
     setLoading(false);
   }
 };
+
 
 
   return (
