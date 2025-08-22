@@ -5,6 +5,14 @@ import ProductCard from '../components/ProductCard';
 import Loader from '../components/Loader';
 import { FaSearch, FaFilter } from 'react-icons/fa';
 
+// دالة لتحويل أي response لـ Array بشكل آمن
+const safeArray = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.products)) return data.products;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
+};
+
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
@@ -28,9 +36,11 @@ const Products = () => {
       if (searchParams.get('sort')) params.append('sort', searchParams.get('sort'));
 
       const response = await axios.get(`/products?${params.toString()}`);
-      setProducts(response.data);
+      const productsArray = safeArray(response.data);
+      setProducts(productsArray);
     } catch (error) {
       console.error('Error fetching products:', error);
+      setProducts([]); // fallback
     } finally {
       setLoading(false);
     }
