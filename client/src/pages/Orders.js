@@ -7,7 +7,12 @@ import { FaBox } from 'react-icons/fa';
 
 const Orders = () => {
   const dispatch = useDispatch();
-  const { orders, isLoading } = useSelector((state) => state.order);
+  const { orders: rawOrders, isLoading } = useSelector((state) => state.order);
+
+// 🔥 دايمًا Array
+  const orders = Array.isArray(rawOrders) ? rawOrders : [];
+
+  
 
   useEffect(() => {
     dispatch(fetchMyOrders());
