@@ -5,14 +5,6 @@ import ProductCard from '../components/ProductCard';
 import Loader from '../components/Loader';
 import { FaSearch, FaFilter } from 'react-icons/fa';
 
-// دالة لتحويل أي response لـ Array بشكل آمن
-const safeArray = (data) => {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.products)) return data.products;
-  if (Array.isArray(data?.items)) return data.items;
-  return [];
-};
-
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
@@ -28,16 +20,19 @@ const Products = () => {
   }, [searchParams]);
 
   const fetchProducts = async () => {
-    setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (searchParams.get('search')) params.append('search', searchParams.get('search'));
-      if (searchParams.get('category')) params.append('category', searchParams.get('category'));
-      if (searchParams.get('sort')) params.append('sort', searchParams.get('sort'));
+      const response = await axios.get('/products');
 
-      const response = await axios.get(`/products?${params.toString()}`);
-      const productsArray = safeArray(response.data);
+      // جذرية: مهما كان شكل response يتحول Array
+      const productsArray = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data.products)
+          ? response.data.products
+          : [];
+
       setProducts(productsArray);
+
+      console.log('Products fetched:', productsArray); // للمتابعة
     } catch (error) {
       console.error('Error fetching products:', error);
       setProducts([]); // fallback
@@ -45,6 +40,7 @@ const Products = () => {
       setLoading(false);
     }
   };
+
 
   const handleSearch = (e) => {
     e.preventDefault();
